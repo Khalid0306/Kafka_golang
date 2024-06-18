@@ -1,25 +1,25 @@
-package consumer
+package main
 
 import (
 	"fmt"
 	"time"
 
-	"github.com/confluentinc/confluent-kafka-go/kafka"
+	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 )
 
-func consumeMessage() {
+func ConsumeMessage() {
 
 	c, err := kafka.NewConsumer(&kafka.ConfigMap{
 		"bootstrap.servers": "172.18.0.5:9092",
-		"group.id":          "test-consumer-group",
-		"auto.offset.reset": "earliest",
+		"group.id":          "test-kafka",
+		"auto.offset.reset": "latest", // "earliest" pour commencer la lecture depuis le début
 	})
 
 	if err != nil {
 		panic(err)
 	}
 
-	c.SubscribeTopics([]string{"acte_metier", "^aRegex.*[Tt]opic"}, nil)
+	c.SubscribeTopics([]string{"acte_metier"}, nil)
 
 	// A signal handler or similar could be used to set this to false to break the loop.
 	run := true
@@ -37,4 +37,10 @@ func consumeMessage() {
 	}
 
 	c.Close()
+}
+
+func main() {
+	ConsumeMessage()
+    // Prevent the main function from exiting immediately
+    select {}
 }

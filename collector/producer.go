@@ -1,18 +1,30 @@
-package producer
+package main
 
 import (
 	"fmt"
-
-	"github.com/confluentinc/confluent-kafka-go/kafka"
+	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 )
 
-func produceMessage() {
-	p, err := kafka.NewProducer(&kafka.ConfigMap{"bootstrap.servers": "172.18.0.5:9092"})
+
+func main() {
+	topic := "acte_metier"
+
+	fmt.Println("Hello, I'm producing message...")
+
+	p, err := kafka.NewProducer(&kafka.ConfigMap{"bootstrap.servers": "172.18.0.5"})
 	if err != nil {
 		panic(err)
 	}
 
 	defer p.Close()
+
+	// Produce messages to topic (asynchronously)
+	for _, word := range []string{"Welcome", "to", "the", "Confluent", "Kafka", "Golang", "client"} {
+		p.Produce(&kafka.Message{
+			TopicPartition: kafka.TopicPartition{Topic: &topic, Partition: kafka.PartitionAny},
+			Value:          []byte(word),
+		}, nil)
+	}
 
 	// Delivery report handler for produced messages
 	go func() {
@@ -23,20 +35,16 @@ func produceMessage() {
 					fmt.Printf("Delivery failed: %v\n", ev.TopicPartition)
 				} else {
 					fmt.Printf("Delivered message to %v\n", ev.TopicPartition)
+					// fmt.Println(string(ev.Value))
 				}
+			default:
+				fmt.Printf("Ignored event: %v\n", e)
 			}
 		}
 	}()
 
-	// Produce messages to topic (asynchronously)
-	topic := "myTopic"
-	for _, word := range []string{"Welcome", "to", "the", "Confluent", "Kafka", "Golang", "client"} {
-		p.Produce(&kafka.Message{
-			TopicPartition: kafka.TopicPartition{Topic: &topic, Partition: kafka.PartitionAny},
-			Value:          []byte(word),
-		}, nil)
-	}
-
 	// Wait for message deliveries before shutting down
-	p.Flush(15 * 1000)
+	p.Flush(2 * 1000)
+
+	fmt.Println("I'm done producing message...")
 }
