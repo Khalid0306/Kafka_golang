@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 	"strings"
-	"github.com/khalid0306/Kafka_golang/formatter/csv"
 )
 
 type ActeMetierFormatter struct {
