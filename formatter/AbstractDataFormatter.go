@@ -3,114 +3,127 @@ package formatter
 import (
 	"strings"
 	"time"
+	"log"
 )
 
-type AbstractDataFormatter interface {
-	Format(payload map[string]interface{}) map[string]interface{}
+// AbstractDataFormatter represents the abstract data formatter
+type AbstractDataFormatter struct {
+	PathsMapping        map[string]string
+	TypesMapping        map[string]func(string) interface{}
+	DatesMapping        map[string][3]string
+	NullEmptyFieldMap   []string
+	RemoveFieldMap      []string
+	NotDefinedFieldMap  map[string]string
+	RenameFieldMap      map[string]string
+	CodeNotDefined      string
+	LabelNotDefined     string
 }
 
-type BaseFormatter struct {
-	PATHS_MAPPING     map[string]string
-	TYPES_MAPPING     map[string]func(interface{}) interface{}
-	DATES_MAPPING     map[string][]string
-	NULL_EMPTY_FIELD  []string
-	REMOVE_FIELD      []string
-	NOT_DEFINED_FIELD map[string]string
-	RENAME_FIELD      map[string]string
-
-	CODE_NOT_DEFINED  string
-	LABEL_NOT_DEFINED string
-}
-
-func NewBaseFormatter() *BaseFormatter {
-	return &BaseFormatter{
-		PATHS_MAPPING:     make(map[string]string),
-		TYPES_MAPPING:     make(map[string]func(interface{}) interface{}),
-		DATES_MAPPING:     make(map[string][]string),
-		NULL_EMPTY_FIELD:  []string{},
-		REMOVE_FIELD:      []string{},
-		NOT_DEFINED_FIELD: make(map[string]string),
-		RENAME_FIELD:      make(map[string]string),
-
-		CODE_NOT_DEFINED:  "NonDefini",
-		LABEL_NOT_DEFINED: "Non défini",
+// NewAbstractDataFormatter creates a new instance of AbstractDataFormatter
+func NewAbstractDataFormatter() *AbstractDataFormatter {
+	return &AbstractDataFormatter{
+		PathsMapping:       make(map[string]string),
+		TypesMapping:       make(map[string]func(string) interface{}),
+		DatesMapping:       make(map[string][3]string),
+		NullEmptyFieldMap:  []string{},
+		RemoveFieldMap:     []string{},
+		NotDefinedFieldMap: make(map[string]string),
+		RenameFieldMap:     make(map[string]string),
+		CodeNotDefined:     "NonDefini",
+		LabelNotDefined:    "Non défini",
 	}
 }
 
-func (bf *BaseFormatter) FormatPath(payload, formattedPayload map[string]interface{}) map[string]interface{} {
-	for source, destination := range bf.PATHS_MAPPING {
-		if value, exists := payload[source]; exists {
-			formattedPayload[destination] = value
-		}
+// FormatPath formats the paths based on PathsMapping
+func (adf *AbstractDataFormatter) FormatPath(payload map[string]string, formattedPayload map[string]interface{}) map[string]interface{} {
+	for source, destination := range adf.PathsMapping {
+		value := payload[source]
+		formattedPayload[destination] = value
 	}
 	return formattedPayload
 }
 
-func (bf *BaseFormatter) FormatType(formattedPayload map[string]interface{}) map[string]interface{} {
-	for source, transform := range bf.TYPES_MAPPING {
-		if value, exists := formattedPayload[source]; exists {
-			formattedPayload[source] = transform(value)
-		}
+// FormatType formats the types based on TypesMapping
+func (adf *AbstractDataFormatter) FormatType(formattedPayload map[string]interface{}) map[string]interface{} {
+	for source, transform := range adf.TypesMapping {
+		value := formattedPayload[source].(string)
+		formattedPayload[source] = transform(value)
 	}
 	return formattedPayload
 }
 
-func (bf *BaseFormatter) FormatDate(formattedPayload map[string]interface{}) map[string]interface{} {
-	for source, dateConf := range bf.DATES_MAPPING {
-		if value, exists := formattedPayload[source]; exists {
-			if strValue, ok := value.(string); ok && strValue != "" {
-				if strings.Contains(strValue, ".") && len(strings.Split(strValue, ".")[1]) == 7 {
-					strValue = strValue[:len(strValue)-1]
-				}
-				dateObj, err := time.Parse(dateConf[0], strValue)
-				if err == nil {
-					destTz, _ := time.LoadLocation(dateConf[2])
-					dateObj = dateObj.In(destTz)
-					formattedPayload[source] = dateObj.Format(time.RFC3339)
-				}
-			}
+// FormatDate formats the dates based on DatesMapping
+func (adf *AbstractDataFormatter) FormatDate(formattedPayload map[string]interface{}) map[string]interface{} {
+	for source, dateConf := range adf.DatesMapping {
+		value := formattedPayload[source].(string)
+		if value == "" {
+			continue
 		}
+		if strings.Contains(value, ".") && len(strings.Split(value, ".")[1]) == 7 {
+			value = value[:len(value)-1]
+		}
+		loc, err := time.LoadLocation(dateConf[1])
+		if err != nil {
+			log.Printf("Error loading location: %v\n", err)
+			continue
+		}
+		dateObj, err := time.Parse(dateConf[0], value)
+		if err != nil {
+			log.Printf("Error parsing date: %v\n", err)
+			continue
+		}
+		destTz, err := time.LoadLocation(dateConf[2])
+		if err != nil {
+			destTz = time.UTC
+		}
+		dateObj = dateObj.In(loc).In(destTz)
+		formattedPayload[source] = dateObj.Format(time.RFC3339)
 	}
 	return formattedPayload
 }
 
-func (bf *BaseFormatter) NullEmptyField(formattedPayload map[string]interface{}) map[string]interface{} {
-	for _, field := range bf.NULL_EMPTY_FIELD {
-		if value, exists := formattedPayload[field]; exists && (value == nil || value == "NULL" || value == "") {
+// NullEmptyField sets null values for empty fields
+func (adf *AbstractDataFormatter) NullEmptyField(formattedPayload map[string]interface{}) map[string]interface{} {
+	for _, field := range adf.NullEmptyFieldMap {
+		if value, exists := formattedPayload[field]; exists && (value == "" || value == "NULL") {
 			formattedPayload[field] = nil
 		}
 	}
 	return formattedPayload
 }
 
-func (bf *BaseFormatter) NullAllEmptyField(formattedPayload map[string]interface{}) map[string]interface{} {
+// NullAllEmptyField sets null values for all empty fields
+func (adf *AbstractDataFormatter) NullAllEmptyField(formattedPayload map[string]interface{}) map[string]interface{} {
 	for field, value := range formattedPayload {
-		if value == nil || value == "NULL" || value == "" {
+		if value == "" || value == "NULL" {
 			formattedPayload[field] = nil
 		}
 	}
 	return formattedPayload
 }
 
-func (bf *BaseFormatter) RemoveField(formattedPayload map[string]interface{}) map[string]interface{} {
-	for _, field := range bf.REMOVE_FIELD {
+// RemoveField removes specified fields from the payload
+func (adf *AbstractDataFormatter) RemoveField(formattedPayload map[string]interface{}) map[string]interface{} {
+	for _, field := range adf.RemoveFieldMap {
 		delete(formattedPayload, field)
 	}
 	return formattedPayload
 }
 
-func (bf *BaseFormatter) NotDefinedField(formattedPayload map[string]interface{}) map[string]interface{} {
-	for code, label := range bf.NOT_DEFINED_FIELD {
-		if value, exists := formattedPayload[code]; !exists || value == "ERROR" || value == "" {
-			formattedPayload[code] = bf.CODE_NOT_DEFINED
-			formattedPayload[label] = bf.LABEL_NOT_DEFINED
+// NotDefinedField sets not defined fields based on NotDefinedField mapping
+func (adf *AbstractDataFormatter) NotDefinedField(formattedPayload map[string]interface{}) map[string]interface{} {
+	for code, label := range adf.NotDefinedFieldMap {
+		if (formattedPayload[code] == "ERROR") || formattedPayload[code] == nil {
+			formattedPayload[code] = adf.CodeNotDefined
+			formattedPayload[label] = adf.LabelNotDefined
 		}
 	}
 	return formattedPayload
 }
 
-func (bf *BaseFormatter) RenameField(formattedPayload map[string]interface{}) map[string]interface{} {
-	for fromField, toField := range bf.RENAME_FIELD {
+// RenameField renames fields based on RenameField mapping
+func (adf *AbstractDataFormatter) RenameField(formattedPayload map[string]interface{}) map[string]interface{} {
+	for fromField, toField := range adf.RenameFieldMap {
 		if value, exists := formattedPayload[fromField]; exists {
 			formattedPayload[toField] = value
 			delete(formattedPayload, fromField)
@@ -119,16 +132,14 @@ func (bf *BaseFormatter) RenameField(formattedPayload map[string]interface{}) ma
 	return formattedPayload
 }
 
-func (bf *BaseFormatter) TrimField(payload map[string]interface{}, char string) map[string]interface{} {
+// TrimField trims leading and trailing spaces or specified characters from all fields
+func (adf *AbstractDataFormatter) TrimField(payload map[string]string, char *string) map[string]string {
 	for key, data := range payload {
-		if strData, ok := data.(string); ok {
-			if char != "" {
-				payload[key] = strings.Trim(strData, char)
-			} else {
-				payload[key] = strings.TrimSpace(strData)
-			}
+		if char != nil {
+			payload[key] = strings.Trim(data, *char)
+		} else {
+			payload[key] = strings.TrimSpace(data)
 		}
 	}
 	return payload
 }
-

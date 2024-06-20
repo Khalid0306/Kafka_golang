@@ -2,7 +2,6 @@ package formatter
 
 import (
 	"encoding/csv"
-	"fmt"
 	"io"
 	"log"
 	"os"
@@ -25,7 +24,7 @@ func (acf *AbstractCsvFormatter) Supports(fileName string) bool {
 	return acf.FileName == fileName
 }
 
-func (acf *AbstractCsvFormatter) ReadFile(path string) ([][]map[string]string, error) {
+func (acf *AbstractCsvFormatter) ReadFile(path string) ([]map[string]string, error) {
 	file, err := os.Open(path)
 	if err != nil {
 		return nil, err
@@ -36,7 +35,7 @@ func (acf *AbstractCsvFormatter) ReadFile(path string) ([][]map[string]string, e
 	reader.Comma = ';'
 	reader.FieldsPerRecord = -1
 
-	var rows [][]map[string]string
+	var rows []map[string]string
 	var rowNumber int
 
 	for {
@@ -82,4 +81,3 @@ func (acf *AbstractCsvFormatter) zip(headers []string, row []string) map[string]
 	}
 	return data
 }
-

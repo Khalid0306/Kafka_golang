@@ -1,42 +1,40 @@
 package main
 
 import (
-	"fmt"
-	"time"
+    "fmt"
+    "log"
 
-	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
+    "github.com/confluentinc/confluent-kafka-go/v2/kafka"
+)
+
+const (
+    KAFKA_BROKER = "172.18.0.5:9092"
 )
 
 func ConsumeMessage() {
+    c, err := kafka.NewConsumer(&kafka.ConfigMap{
+        "bootstrap.servers": KAFKA_BROKER,
+        "group.id":          "test-kafka-golang",
+        "auto.offset.reset": "latest",
+    })
 
-	c, err := kafka.NewConsumer(&kafka.ConfigMap{
-		"bootstrap.servers": "172.18.0.5:9092",
-		"group.id":          "test-kafka",
-		"auto.offset.reset": "latest", // "earliest" pour commencer la lecture depuis le début
-	})
+    if err != nil {
+        log.Fatalf("Failed to create consumer: %s", err)
+    }
 
-	if err != nil {
-		panic(err)
-	}
+    c.SubscribeTopics([]string{"acte_metier"}, nil)
 
-	c.SubscribeTopics([]string{"acte_metier"}, nil)
+    for {
+        msg, err := c.ReadMessage(-1)
+        if err == nil {
+            fmt.Printf("Message on %s: %s\n", msg.TopicPartition, string(msg.Value))
+        } else {
+            // The client will automatically try to recover from all errors.
+            fmt.Printf("Consumer error: %v (%v)\n", err, msg)
+        }
+    }
 
-	// A signal handler or similar could be used to set this to false to break the loop.
-	run := true
-
-	for run {
-		msg, err := c.ReadMessage(time.Second)
-		if err == nil {
-			fmt.Printf("Message on %s: %s\n", msg.TopicPartition, string(msg.Value))
-		} else if !err.(kafka.Error).IsTimeout() {
-			// The client will automatically try to recover from all errors.
-			// Timeout is not considered an error because it is raised by
-			// ReadMessage in absence of messages.
-			fmt.Printf("Consumer error: %v (%v)\n", err, msg)
-		}
-	}
-
-	c.Close()
+    c.Close()
 }
 
 func main() {

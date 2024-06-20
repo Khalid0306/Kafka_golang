@@ -1,10 +1,5 @@
 package model
 
-import (
-	"encoding/json"
-	"fmt"
-)
-
 type Message struct {
 	Payload   interface{}  `json:"payload"`
 	Traces    []*Trace     `json:"traces"`
@@ -67,7 +62,7 @@ func (m *Message) ToDict() map[string]interface{} {
 		tracesDict[i] = trace.ToDict()
 	}
 
-	metadatasDict := make([]map[string]interface{}, len(m.Metadatas))
+	metadatasDict := make([]map[string]string, len(m.Metadatas))
 	for i, metadata := range m.Metadatas {
 		metadatasDict[i] = metadata.ToDict()
 	}
