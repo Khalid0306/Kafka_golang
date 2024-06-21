@@ -37,7 +37,7 @@ func runTest(choice string) {
 
 			// Rename the file
 			oldName := "processing_times.txt"
-			newName := fmt.Sprintf("ConfluentGoKafka_processing_times_%s_5000_%d.txt", choice, i)
+			newName := fmt.Sprintf("ConfluentGoKafka_processing_times_%s_500000_%d.txt", choice, i)
 			err = os.Rename(oldName, newName)
 			if err != nil {
 				fmt.Printf("Error renaming file: %s\n", err)

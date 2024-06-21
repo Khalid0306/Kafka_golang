@@ -27,7 +27,8 @@ var (
 )
 
 func main() {
-    log.Println("Starting Kafka Producer")
+
+    log.Println("Starting Kafka Producer ...")
 
     // Kafka producer configuration
     p, err := kafka.NewProducer(&kafka.ConfigMap{"bootstrap.servers": KAFKA_BROKER})
@@ -80,31 +81,31 @@ func main() {
         }
 
         // Send message to Kafka topic 'acte_metier'
-        deliveryChan := make(chan kafka.Event)
         err = p.Produce(&kafka.Message{
             TopicPartition: kafka.TopicPartition{Topic: &topic, Partition: kafka.PartitionAny},
             Value:          payloadMessage,
-        }, deliveryChan)
+        }, nil)
         if err != nil {
             log.Fatalf("Failed to produce message: %s", err)
         }
 
-        // Wait for delivery report
-        e := <-deliveryChan
-        m := e.(*kafka.Message)
-        if m.TopicPartition.Error != nil {
-            log.Printf("Delivery failed: %v\n", m.TopicPartition)
-        } else {
-            log.Printf("Delivered message to %v\n", m.TopicPartition)
-        }
+        go func() {
+            for e := range p.Events() {
+                switch ev := e.(type) {
+                case *kafka.Message:
+                    if ev.TopicPartition.Error != nil {
+                        log.Printf("Delivery failed: %v\n", ev.TopicPartition)
+                    } else {
+                        log.Printf("Delivered message to %v\n", ev.TopicPartition)
+                    }
+                }
+            }
+        }()
 
         // Check JSON validity
         if err := json.Unmarshal(payloadMessage, &map[string]interface{}{}); err != nil {
             log.Fatalf("Invalid JSON: %s", err)
         }
-
-        // Log message details (uncomment if needed)
-        // log.Printf("Sending message: %s\n", payloadMessage)
 
         // Check for 'IdentifiantVICR' and send another message if present
         identifiantVICR := fmt.Sprintf("%v", row["IdentifiantVICR"])
@@ -121,28 +122,33 @@ func main() {
                 log.Fatalf("Error marshaling intervention message to JSON: %s", err)
             }
 
-            // Send message to Kafka topic 'acte_metier'
-            err = p.Produce(&kafka.Message{
-                TopicPartition: kafka.TopicPartition{Topic: &topic, Partition: kafka.PartitionAny},
-                Value:          payloadMessageIntervention,
-            }, deliveryChan)
-            if err != nil {
-                log.Fatalf("Failed to produce intervention message: %s", err)
-            }
-
-            // Wait for delivery report
-            e := <-deliveryChan
-            m := e.(*kafka.Message)
-            if m.TopicPartition.Error != nil {
-                log.Printf("Delivery failed: %v\n", m.TopicPartition)
-            } else {
-                log.Printf("Delivered intervention message to %v\n", m.TopicPartition)
-            }
-
             // Check JSON validity
             if err := json.Unmarshal(payloadMessageIntervention, &map[string]interface{}{}); err != nil {
                 log.Fatalf("Invalid JSON for intervention message: %s", err)
             }
+
+            // Send message to Kafka topic 'acte_metier'
+            err = p.Produce(&kafka.Message{
+                TopicPartition: kafka.TopicPartition{Topic: &topic, Partition: kafka.PartitionAny},
+                Value:          payloadMessageIntervention,
+            }, nil)
+            if err != nil {
+                log.Fatalf("Failed to produce intervention message: %s", err)
+            }
+
+            go func() {
+                for e := range p.Events() {
+                    switch ev := e.(type) {
+                    case *kafka.Message:
+                        if ev.TopicPartition.Error != nil {
+                            log.Printf("Delivery failed: %v\n", ev.TopicPartition)
+                        } else {
+                            log.Printf("Delivered intervention message to %v\n", ev.TopicPartition)
+                        }
+                    }
+                }
+            }()
+
         }
 
         // End timer for individual row processing
@@ -151,7 +157,7 @@ func main() {
         insideProcessingTimesArray = append(insideProcessingTimesArray, insideProcessingTime)
 
         // Limit number of messages sent
-        if len(insideProcessingTimesArray) >= 5000 {
+        if len(insideProcessingTimesArray) >= 500000 {
             break
         }
     }
