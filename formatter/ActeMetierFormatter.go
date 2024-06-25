@@ -8,7 +8,7 @@ import (
 
 type ActeMetierFormatter struct {
 	*AbstractCsvFormatter
-	Formatter *StandardFormatter
+	Formatter             *StandardFormatter
 	AbstractDataFormatter *AbstractDataFormatter
 }
 
@@ -20,12 +20,8 @@ func NewActeMetierFormatter(formatter *StandardFormatter, logger *log.Logger) *A
 }
 
 func (amf *ActeMetierFormatter) GetRow(data map[string]interface{}) map[string]interface{} {
-	// Convert map[string]interface{} to map[string]string
-	dataString := convertMapStringInterfaceToStringString(data)
-	dataString = amf.AbstractDataFormatter.TrimField(dataString, nil)
 
-	// Convert map[string]string back to map[string]interface{}
-	data = convertMapStringStringToInterface(dataString)
+	data = amf.AbstractDataFormatter.TrimFieldInterface(data, nil)
 
 	if data["CodeFamilleActe"] == "ERROR" {
 		data["CodeFamilleActe"] = nil
@@ -86,29 +82,5 @@ func (amf *ActeMetierFormatter) GetRow(data map[string]interface{}) map[string]i
 		}
 	}
 
-	// Convert map[string]string to map[string]interface{}
-    formattedData := amf.Formatter.Format(convertMapStringStringToInterface(dataString))
-    returnData := make(map[string]interface{})
-    for key, value := range formattedData {
-        returnData[key] = value
-    }
-    return returnData
-}
-
-// Helper function to convert map[string]interface{} to map[string]string
-func convertMapStringInterfaceToStringString(data map[string]interface{}) map[string]string {
-    newData := make(map[string]string)
-    for key, value := range data {
-        newData[key] = fmt.Sprintf("%v", value)
-    }
-    return newData
-}
-
-// Helper function to convert map[string]string to map[string]interface{}
-func convertMapStringStringToInterface(data map[string]string) map[string]interface{} {
-    newData := make(map[string]interface{})
-    for key, value := range data {
-        newData[key] = value
-    }
-    return newData
+	return amf.Formatter.Format(data)
 }

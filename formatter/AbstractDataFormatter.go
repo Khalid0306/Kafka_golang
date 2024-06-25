@@ -6,7 +6,7 @@ import (
 	"log"
 )
 
-// AbstractDataFormatter represents the abstract data formatter
+// AbstractDataFormatter représente le formateur de données abstrait
 type AbstractDataFormatter struct {
 	PathsMapping        map[string]string
 	TypesMapping        map[string]func(string) interface{}
@@ -19,7 +19,7 @@ type AbstractDataFormatter struct {
 	LabelNotDefined     string
 }
 
-// NewAbstractDataFormatter creates a new instance of AbstractDataFormatter
+// NewAbstractDataFormatter crée une nouvelle instance de AbstractDataFormatter
 func NewAbstractDataFormatter() *AbstractDataFormatter {
 	return &AbstractDataFormatter{
 		PathsMapping:       make(map[string]string),
@@ -34,7 +34,7 @@ func NewAbstractDataFormatter() *AbstractDataFormatter {
 	}
 }
 
-// FormatPath formats the paths based on PathsMapping
+// FormatPath formate les chemins selon PathsMapping
 func (adf *AbstractDataFormatter) FormatPath(payload map[string]string, formattedPayload map[string]interface{}) map[string]interface{} {
 	for source, destination := range adf.PathsMapping {
 		value := payload[source]
@@ -43,7 +43,7 @@ func (adf *AbstractDataFormatter) FormatPath(payload map[string]string, formatte
 	return formattedPayload
 }
 
-// FormatType formats the types based on TypesMapping
+// FormatType formate les types selon TypesMapping
 func (adf *AbstractDataFormatter) FormatType(formattedPayload map[string]interface{}) map[string]interface{} {
 	for source, transform := range adf.TypesMapping {
 		value := formattedPayload[source].(string)
@@ -52,7 +52,7 @@ func (adf *AbstractDataFormatter) FormatType(formattedPayload map[string]interfa
 	return formattedPayload
 }
 
-// FormatDate formats the dates based on DatesMapping
+// FormatDate formate les dates selon DatesMapping
 func (adf *AbstractDataFormatter) FormatDate(formattedPayload map[string]interface{}) map[string]interface{} {
 	for source, dateConf := range adf.DatesMapping {
 		value := formattedPayload[source].(string)
@@ -64,12 +64,12 @@ func (adf *AbstractDataFormatter) FormatDate(formattedPayload map[string]interfa
 		}
 		loc, err := time.LoadLocation(dateConf[1])
 		if err != nil {
-			log.Printf("Error loading location: %v\n", err)
+			log.Printf("Erreur de chargement de l'emplacement : %v\n", err)
 			continue
 		}
 		dateObj, err := time.Parse(dateConf[0], value)
 		if err != nil {
-			log.Printf("Error parsing date: %v\n", err)
+			log.Printf("Erreur de parsing de la date : %v\n", err)
 			continue
 		}
 		destTz, err := time.LoadLocation(dateConf[2])
@@ -82,7 +82,7 @@ func (adf *AbstractDataFormatter) FormatDate(formattedPayload map[string]interfa
 	return formattedPayload
 }
 
-// NullEmptyField sets null values for empty fields
+// NullEmptyField définit des valeurs nulles pour les champs vides
 func (adf *AbstractDataFormatter) NullEmptyField(formattedPayload map[string]interface{}) map[string]interface{} {
 	for _, field := range adf.NullEmptyFieldMap {
 		if value, exists := formattedPayload[field]; exists && (value == "" || value == "NULL") {
@@ -92,7 +92,7 @@ func (adf *AbstractDataFormatter) NullEmptyField(formattedPayload map[string]int
 	return formattedPayload
 }
 
-// NullAllEmptyField sets null values for all empty fields
+// NullAllEmptyField définit des valeurs nulles pour tous les champs vides
 func (adf *AbstractDataFormatter) NullAllEmptyField(formattedPayload map[string]interface{}) map[string]interface{} {
 	for field, value := range formattedPayload {
 		if value == "" || value == "NULL" {
@@ -102,7 +102,7 @@ func (adf *AbstractDataFormatter) NullAllEmptyField(formattedPayload map[string]
 	return formattedPayload
 }
 
-// RemoveField removes specified fields from the payload
+// RemoveField supprime les champs spécifiés du payload
 func (adf *AbstractDataFormatter) RemoveField(formattedPayload map[string]interface{}) map[string]interface{} {
 	for _, field := range adf.RemoveFieldMap {
 		delete(formattedPayload, field)
@@ -110,7 +110,7 @@ func (adf *AbstractDataFormatter) RemoveField(formattedPayload map[string]interf
 	return formattedPayload
 }
 
-// NotDefinedField sets not defined fields based on NotDefinedField mapping
+// NotDefinedField définit les champs non définis selon NotDefinedFieldMapping
 func (adf *AbstractDataFormatter) NotDefinedField(formattedPayload map[string]interface{}) map[string]interface{} {
 	for code, label := range adf.NotDefinedFieldMap {
 		if (formattedPayload[code] == "ERROR") || formattedPayload[code] == nil {
@@ -121,7 +121,7 @@ func (adf *AbstractDataFormatter) NotDefinedField(formattedPayload map[string]in
 	return formattedPayload
 }
 
-// RenameField renames fields based on RenameField mapping
+// RenameField renomme les champs selon RenameFieldMapping
 func (adf *AbstractDataFormatter) RenameField(formattedPayload map[string]interface{}) map[string]interface{} {
 	for fromField, toField := range adf.RenameFieldMap {
 		if value, exists := formattedPayload[fromField]; exists {
@@ -132,7 +132,7 @@ func (adf *AbstractDataFormatter) RenameField(formattedPayload map[string]interf
 	return formattedPayload
 }
 
-// TrimField trims leading and trailing spaces or specified characters from all fields
+// TrimField supprime les espaces ou les caractères spécifiés des champs
 func (adf *AbstractDataFormatter) TrimField(payload map[string]string, char *string) map[string]string {
 	for key, data := range payload {
 		if char != nil {
@@ -142,4 +142,14 @@ func (adf *AbstractDataFormatter) TrimField(payload map[string]string, char *str
 		}
 	}
 	return payload
+}
+
+// TrimFieldInterface supprime les espaces des champs dans une map[string]interface{}
+func (adf *AbstractDataFormatter) TrimFieldInterface(data map[string]interface{}, fields []string) map[string]interface{} {
+	for key, value := range data {
+		if strVal, ok := value.(string); ok {
+			data[key] = strings.TrimSpace(strVal)
+		}
+	}
+	return data
 }

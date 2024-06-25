@@ -8,11 +8,13 @@ import (
     "os"
     "strings"
     "time"
+    "context"
+    "runtime"
+    "sync" 
 
-    "github.com/confluentinc/confluent-kafka-go/v2/kafka"
+    kafka "github.com/segmentio/kafka-go"
     "github.com/khalid0306/Kafka_golang/formatter"
     "github.com/khalid0306/Kafka_golang/model"
-    "runtime"
 )
 
 const (
@@ -24,26 +26,28 @@ const (
 var (
     insideProcessingTimesArray []float64
     outsideProcessingTime      float64
+    wg sync.WaitGroup
 )
 
 func main() {
 
     log.Println("Starting Kafka Producer ...")
 
-    // Kafka producer configuration
-    p, err := kafka.NewProducer(&kafka.ConfigMap{"bootstrap.servers": KAFKA_BROKER})
-    if err != nil {
-        log.Fatalf("Failed to create producer: %s", err)
-    }
-    defer p.Close()
+    topic := "acte_metier1"
 
-    // Formatter setup (you need to define this according to your formatter implementation)
+    // configuration du producer Kafka
+    w := kafka.NewWriter(kafka.WriterConfig{
+        Brokers:  []string{KAFKA_BROKER},
+        Topic:    topic,
+        Balancer: &kafka.LeastBytes{},
+    })
+    defer w.Close()
+
     formatter := formatter.NewActeMetierFormatter(nil, log.New(os.Stdout, "", log.LstdFlags))
 
-    // Start time to measure overall processing time
+    // Commencer le timer pour le traitement global
     outsideLoopStartTimer := time.Now()
 
-    // Read payload from file
     payload := map[string]interface{}{
         "tmpfilepath": "664daa0d1be0dDHbmbJ",
     }
@@ -52,62 +56,54 @@ func main() {
     entityMetadata := model.NewMetadata("entity", ENTITY_METADATA)
     interventionMetadata := model.NewMetadata("entity", INTERVENTION_METADATA)
 
-    // Read file contents
+    // Lire le ficher
     rows, err := formatter.ReadFile(payload["tmpfilepath"].(string))
     if err != nil {
         log.Fatalf("Error reading file: %s", err)
     }
 
-    // Define the topic variable
-    topic := "acte_metier"
+    errChan := make(chan error, len(rows)*2)
 
-    // Iterate over rows
     for _, row := range rows {
         if row == nil {
             continue
         }
 
-        // Start timer for individual row processing
+        // Commencer le timer pour le traitement de chaque ligne
         insideLoopStartTimer := time.Now()
 
-        // Construct Message from row data
         message := model.NewMessage(row, nil, nil)
         message.AddMetadata(entityMetadata)
 
-        // Convert message to JSON
+        // Convertir le message en JSON
         payloadMessage, err := json.Marshal(message.ToDict())
         if err != nil {
             log.Fatalf("Error marshaling message to JSON: %s", err)
         }
 
-        // Send message to Kafka topic 'acte_metier'
-        err = p.Produce(&kafka.Message{
-            TopicPartition: kafka.TopicPartition{Topic: &topic, Partition: kafka.PartitionAny},
-            Value:          payloadMessage,
-        }, nil)
-        if err != nil {
-            log.Fatalf("Failed to produce message: %s", err)
-        }
-
-        go func() {
-            for e := range p.Events() {
-                switch ev := e.(type) {
-                case *kafka.Message:
-                    if ev.TopicPartition.Error != nil {
-                        log.Printf("Delivery failed: %v\n", ev.TopicPartition)
-                    } else {
-                        log.Printf("Delivered message to %v\n", ev.TopicPartition)
-                    }
-                }
-            }
-        }()
-
-        // Check JSON validity
+        // Verifer la validité du JSON
         if err := json.Unmarshal(payloadMessage, &map[string]interface{}{}); err != nil {
             log.Fatalf("Invalid JSON: %s", err)
         }
+        
+        wg.Add(1) // Ajouter 1 pour chaque goroutine lancée
 
-        // Check for 'IdentifiantVICR' and send another message if present
+        // Envoyer les messages au topic 'acte_metier'
+        go func(msg kafka.Message) {
+            defer wg.Done() // Marquer la fin de la goroutine à la fin de son exécution
+
+            if err := w.WriteMessages(context.Background(), msg); err != nil {
+                errChan <- err
+            } else {
+                log.Printf("Delivered message to %v\n", w.Topic)
+                errChan <- nil
+            }
+        }(kafka.Message{
+            Key:   []byte("test-key"),
+            Value: payloadMessage,
+        })
+
+        // Verifie 'IdentifiantVICR' et envoie un autre message si présent
         identifiantVICR := fmt.Sprintf("%v", row["IdentifiantVICR"])
         if identifiantVICR != "" {
             intervention := map[string]interface{}{
@@ -122,59 +118,61 @@ func main() {
                 log.Fatalf("Error marshaling intervention message to JSON: %s", err)
             }
 
-            // Check JSON validity
             if err := json.Unmarshal(payloadMessageIntervention, &map[string]interface{}{}); err != nil {
                 log.Fatalf("Invalid JSON for intervention message: %s", err)
             }
 
-            // Send message to Kafka topic 'acte_metier'
-            err = p.Produce(&kafka.Message{
-                TopicPartition: kafka.TopicPartition{Topic: &topic, Partition: kafka.PartitionAny},
-                Value:          payloadMessageIntervention,
-            }, nil)
-            if err != nil {
-                log.Fatalf("Failed to produce intervention message: %s", err)
-            }
+            wg.Add(1)
 
-            go func() {
-                for e := range p.Events() {
-                    switch ev := e.(type) {
-                    case *kafka.Message:
-                        if ev.TopicPartition.Error != nil {
-                            log.Printf("Delivery failed: %v\n", ev.TopicPartition)
-                        } else {
-                            log.Printf("Delivered intervention message to %v\n", ev.TopicPartition)
-                        }
-                    }
+            go func(msg kafka.Message) {
+                defer wg.Done()
+                
+                if err := w.WriteMessages(context.Background(), msg); err != nil {
+                    errChan <- err
+                } else {
+                    log.Printf("Delivered intervention message to %v\n", w.Topic)
+                    errChan <- nil
                 }
-            }()
+            }(kafka.Message{
+                Key:   []byte("test-key"),
+                Value: payloadMessageIntervention,
+            })    
 
         }
 
-        // End timer for individual row processing
+        // Fin du timer pour le traitement de chaque ligne
         insideLoopEndTimer := time.Now()
         insideProcessingTime := insideLoopEndTimer.Sub(insideLoopStartTimer).Seconds()
         insideProcessingTimesArray = append(insideProcessingTimesArray, insideProcessingTime)
 
-        // Limit number of messages sent
-        if len(insideProcessingTimesArray) >= 500000 {
+        // Limite le nombre de messages envoyés pour les tests
+        if len(insideProcessingTimesArray) >= 5000 {
             break
         }
     }
 
-    // End timer for overall processing
+    go func() {
+        wg.Wait() // Attendre ici que toutes les goroutines soient terminées
+        close(errChan) // Fermer le canal une fois que toutes les goroutines sont terminées
+    }()
+
+    // Attendre que tous les messages soient envoyés
+    for err := range errChan {
+        if err != nil {
+            log.Printf("Error producing message: %s", err)
+        }
+    }    
+
+    log.Println("Producer shuting down... ")
+
+    // Fin du timer pour le traitement global
     outsideLoopEndTimer := time.Now()
     outsideProcessingTime = outsideLoopEndTimer.Sub(outsideLoopStartTimer).Seconds()
 
-    // Write processing times to file
     writeToFile()
-
-    // Flush messages and close producer
-    p.Flush(5 * 1000)
-    log.Println("Producer finished")
 }
 
-// Function to write processing times to a file
+// Méthode pour écrire les temps de traitement dans un fichier
 func writeToFile() {
     if len(insideProcessingTimesArray) == 0 {
         return
@@ -191,10 +189,9 @@ func writeToFile() {
 
     memoryUsage := fmt.Sprintf("Memory usage: %d KB", getMemoryUsage())
 
-    // File path
+
     filePath := "../collectorOutputTest/processing_times.txt"
 
-    // Prepare lines to write to file
     lines := []string{}
     for _, time := range insideProcessingTimesArray {
         lines = append(lines, fmt.Sprintf("%.6f", time))
@@ -203,14 +200,13 @@ func writeToFile() {
     lines = append(lines, displayTestDuration)
     lines = append(lines, memoryUsage)
 
-    // Write lines to file
     err := ioutil.WriteFile(filePath, []byte(strings.Join(lines, "\n")), 0644)
     if err != nil {
         log.Fatalf("Error writing to file: %s", err)
     }
 }
 
-// Function to calculate average time from an array of times
+// Méthode pour calculer la moyenne des temps de traitement
 func calculateAverage(times []float64) float64 {
     sum := 0.0
     for _, t := range times {
@@ -219,7 +215,7 @@ func calculateAverage(times []float64) float64 {
     return sum / float64(len(times))
 }
 
-// Function to get memory usage
+// Méthodes pour obtenir l'utilisation de la mémoire
 func getMemoryUsage() uint64 {
     var m runtime.MemStats
     runtime.ReadMemStats(&m)

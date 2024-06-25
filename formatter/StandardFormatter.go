@@ -8,7 +8,7 @@ type StandardFormatter struct {
 	*AbstractDataFormatter
 }
 
-// NewStandardFormatter creates a new instance of StandardFormatter
+// NewStandardFormatter creer une nouvelle instance de StandardFormatter
 func NewStandardFormatter() *StandardFormatter {
 	sf := &StandardFormatter{
 		AbstractDataFormatter: NewAbstractDataFormatter(),
@@ -59,7 +59,7 @@ func NewStandardFormatter() *StandardFormatter {
 	return sf
 }
 
-// Format formats the payload using the defined rules
+// Formater le payload
 func (sf *StandardFormatter) Format(payload map[string]interface{}) map[string]interface{} {
 	payload = sf.FormatDate(payload)
 	payload = sf.FormatType(payload)
