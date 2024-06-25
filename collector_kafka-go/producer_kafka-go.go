@@ -146,7 +146,7 @@ func main() {
         insideProcessingTimesArray = append(insideProcessingTimesArray, insideProcessingTime)
 
         // Limite le nombre de messages envoyés pour les tests
-        if len(insideProcessingTimesArray) >= 5000 {
+        if len(insideProcessingTimesArray) >= 500000 {
             break
         }
     }

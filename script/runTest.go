@@ -12,7 +12,7 @@ func runTest(choice string) {
 	if choice == "Setup1" {
 		for i := 1; i <= 5; i++ {
             // Change de répertoire pour le répertoire du producer
-			err := os.Chdir(filepath.Join(os.Getenv("HOME"), "Testprojet/go-kafka/collector_kafka-go"))
+			err := os.Chdir(filepath.Join(os.Getenv("HOME"), "Testprojet/Kafka_golang/collector_kafka-go"))
 			if err != nil {
 				fmt.Printf("Error changing directory: %s\n", err)
 				os.Exit(1)
@@ -29,7 +29,7 @@ func runTest(choice string) {
 			}
 
 			// Change le repertoire pour le repertoire des fichiers de test
-			err = os.Chdir(filepath.Join(os.Getenv("HOME"), "Testprojet/go-kafka/collectorOutputTest"))
+			err = os.Chdir(filepath.Join(os.Getenv("HOME"), "Testprojet/Kafka_golang/collectorOutputTest"))
 			if err != nil {
 				fmt.Printf("Error changing directory: %s\n", err)
 				os.Exit(1)
@@ -37,7 +37,7 @@ func runTest(choice string) {
 
 			// Change le nom du fichier
 			oldName := "processing_times.txt"
-			newName := fmt.Sprintf("kafka-go_processing_times_%s_5000_%d.txt", choice, i)
+			newName := fmt.Sprintf("kafka-go_processing_times_%s_500000_%d.txt", choice, i)
 			err = os.Rename(oldName, newName)
 			if err != nil {
 				fmt.Printf("Error renaming file: %s\n", err)
