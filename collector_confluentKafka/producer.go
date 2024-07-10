@@ -19,6 +19,7 @@ const (
     ENTITY_METADATA       = "App/Entity/ActeMetier"
     INTERVENTION_METADATA = "App/Entity/Intervention"
     KAFKA_BROKER          = "172.18.0.5:9092"
+    TOPIC = "acte_metier"
 )
 
 var (
@@ -37,7 +38,6 @@ func main() {
     }
     defer p.Close()
 
-    // Formatter setup (you need to define this according to your formatter implementation)
     formatter := formatter.NewActeMetierFormatter(nil, log.New(os.Stdout, "", log.LstdFlags))
 
     // Commencer le timer pour le traitement global
@@ -57,9 +57,6 @@ func main() {
     if err != nil {
         log.Fatalf("Error reading file: %s", err)
     }
-
-
-    topic := "acte_metier"
 
     for _, row := range rows {
         if row == nil {
@@ -82,9 +79,8 @@ func main() {
             log.Fatalf("Invalid JSON: %s", err)
         }
 
-        // Envoyer les messages au topic 'acte_metier'
         err = p.Produce(&kafka.Message{
-            TopicPartition: kafka.TopicPartition{Topic: &topic, Partition: kafka.PartitionAny},
+            TopicPartition: kafka.TopicPartition{Topic: &TOPIC, Partition: kafka.PartitionAny},
             Value:          payloadMessage,
         }, nil)
         if err != nil {
@@ -125,7 +121,7 @@ func main() {
             }
 
             err = p.Produce(&kafka.Message{
-                TopicPartition: kafka.TopicPartition{Topic: &topic, Partition: kafka.PartitionAny},
+                TopicPartition: kafka.TopicPartition{Topic: &TOPIC, Partition: kafka.PartitionAny},
                 Value:          payloadMessageIntervention,
             }, nil)
             if err != nil {

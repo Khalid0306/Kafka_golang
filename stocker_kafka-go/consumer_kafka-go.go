@@ -37,7 +37,7 @@ func main() {
         m, err := r.ReadMessage(ctx)
         if err != nil {
             log.Printf("Error reading message: %s", err)
-            // Si une erreur est survenue, continuer
+            // Si une erreur survient, continuer
             continue
         }
 

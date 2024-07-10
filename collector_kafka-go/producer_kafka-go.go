@@ -21,6 +21,7 @@ const (
     ENTITY_METADATA       = "App/Entity/ActeMetier"
     INTERVENTION_METADATA = "App/Entity/Intervention"
     KAFKA_BROKER          = "172.18.0.5:9092"
+    TOPIC = "acte_metier1"
 )
 
 var (
@@ -33,12 +34,10 @@ func main() {
 
     log.Println("Starting Kafka Producer ...")
 
-    topic := "acte_metier1"
-
     // configuration du producer Kafka
     w := kafka.NewWriter(kafka.WriterConfig{
         Brokers:  []string{KAFKA_BROKER},
-        Topic:    topic,
+        Topic:    TOPIC,
         Balancer: &kafka.LeastBytes{},
     })
     defer w.Close()
@@ -88,10 +87,9 @@ func main() {
         
         wg.Add(1) // Ajouter 1 pour chaque goroutine lancée
 
-        // Envoyer les messages au topic 'acte_metier'
         go func(msg kafka.Message) {
-            defer wg.Done() // Marquer la fin de la goroutine à la fin de son exécution
-
+            defer wg.Done() // Marquer la fin de la goroutine 
+            
             if err := w.WriteMessages(context.Background(), msg); err != nil {
                 errChan <- err
             } else {

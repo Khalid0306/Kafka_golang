@@ -75,7 +75,6 @@ func runTest(choice string) {
 			}
 		}
 	} else {
-		// Choix invalide
 		fmt.Println("L'option entrée n'est pas valide ou n'existe pas (l'option valide est : Setup1)")
 		os.Exit(1)
 	}
